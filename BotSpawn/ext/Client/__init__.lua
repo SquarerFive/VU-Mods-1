@@ -1,6 +1,8 @@
 
 local explosionEntityData = nil
 
+
+
 local function getExplosionEntityData()
 	if explosionEntityData ~= nil then
 		return explosionEntityData

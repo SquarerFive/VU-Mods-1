@@ -39,11 +39,27 @@ local adadElapsedTime = 0
 
 local centerpoint = LinearTransform()
 local activePlayer = nil
+
 local ringSpacing = 25
 
 local botTransforms = {}
 local yaws = {}
 local rowBots = {}
+
+Hooks:Install('BulletEntity:Collision', 1, function(hook, entity, hit, giverInfo)
+    if entity ~= nil then
+        --print(entity)
+    end
+    if hit ~= nil then
+        position = hit.position
+        playerPosition = activePlayer.soldier.worldTransform.trans
+        distance = position:Distance(playerPosition)
+        if distance < 5 then
+            activePlayer.soldier.health = activePlayer.soldier.health - 5
+        end
+    end
+    
+end)
 
 Events:Subscribe('Level:Loaded', function()
 
@@ -85,7 +101,7 @@ Events:Subscribe('Engine:Update', function(dt)
 end)
 
 Events:Subscribe('Bot:Update', function(bot, dt)
-
+    
     if spawnAroundPoint and tonumber(bot.name) <= activeBotCount then
         if respawning and bot.soldier == nil then
             yaws[bot.name] = MathUtils:GetRandom(0, 2*math.pi)
@@ -109,6 +125,8 @@ Events:Subscribe('Bot:Update', function(bot, dt)
             local yaw = tonumber(bot.name) * (2 * math.pi / activeBotCount)
             local transform = getYawOffsetTransform(activePlayer.soldier.transform, yaw, ringSpacing)
             Bots:spawnBot(bot, transform, CharacterPoseType.CharacterPoseType_Stand, soldierBlueprint, soldierKit, {})
+            
+            
         end
 
     elseif respawning and bot.soldier == nil and tonumber(bot.name) <= activeBotCount then
@@ -143,6 +161,24 @@ Events:Subscribe('Bot:Update', function(bot, dt)
             bot.input.authoritativeAimingYaw = swayedYaw
         else
             bot.input.authoritativeAimingYaw = yaw
+        end
+        
+        local distanceFromPlayer = math.sqrt(dx ^ 2 + dy ^ 2)
+        
+        if distanceFromPlayer <= 2 then
+            bot.input:SetLevel(EntryInputActionEnum.EIAFire, 0)
+            bot.input:SetLevel(EntryInputActionEnum.EIAMeleeAttack, 1)
+            bot.input:SetLevel(EntryInputActionEnum.EIASelectWeapon6, 1)
+        elseif distanceFromPlayer < 25 then
+            
+            
+            bot.input:SetLevel(EntryInputActionEnum.EIAFire, 1)
+            bot.input:SetLevel(EntryInputActionEnum.EIAMeleeAttack, 0)
+            bot.input:SetLevel(EntryInputActionEnum.EIASelectWeapon1, 1)
+            
+        
+        else
+            bot.input:SetLevel(EntryInputActionEnum.EIAFire, 0)
         end
     end
 
@@ -202,6 +238,20 @@ Events:Subscribe('Player:Chat', function(player, recipientMask, message)
         spawnCenterpoint = false
         spawnInLine = false
         spawnInRing = false
+    elseif parts[1] == "!test" then
+        transform = activePlayer.soldier.worldTransform
+        new_transform = transform:Clone()
+        new_transform:Translate(
+            (new_transform.forward*5)
+        )
+        -- activePlayer.soldier:SetTransform(new_transform)
+        result = RaycastManager:Raycast(transform.trans, new_transform.trans, 1)
+        if result ~= nil then 
+            print("hit something")
+        end
+
+
+
     elseif parts[1] == '!mirror' then
         pointing = false
         mimicking = false
@@ -344,7 +394,7 @@ Events:Subscribe('Player:Chat', function(player, recipientMask, message)
         local spacing = tonumber(parts[3]) or 2
         spawnLineBots(player, amount, spacing)
 
-    elseif parts[1] == '!spawnring' then
+    elseif parts[1] == '!spawnattacking' then
         if tonumber(parts[2]) == nil then
             return
         end
@@ -474,12 +524,14 @@ function spawnRingBots(player, amount, spacing)
         local yaw = i * (2 * math.pi / amount)
         local transform = getYawOffsetTransform(player.soldier.transform, yaw, spacing)
         Bots:spawnBot(rowBots[i], transform, CharacterPoseType.CharacterPoseType_Stand, soldierBlueprint, soldierKit, {})
+        rowBots[i].input:SetLevel(EntryInputActionEnum.EIAFire, 1)
     end
 end
 
 function spawnJohnOnPlayer(player)
     local yaw = player.input.authoritativeAimingYaw
     local transform = getYawOffsetTransform(player.soldier.transform, yaw, -1)
+    
     Bots:spawnBot(rowBots[numberOfBots], transform, CharacterPoseType.CharacterPoseType_Crouch, soldierBlueprint, soldierKit, {})
     rowBots[numberOfBots].input.authoritativeAimingYaw = yaw
     rowBots[numberOfBots].input:SetLevel(EntryInputActionEnum.EIAFire, 1)
